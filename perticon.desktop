@@ -1,0 +1,6 @@
+Desktop Entry]
+Type=Application
+Terminal=true
+Name=Perticon Grading
+Icon=/home/perticon/projects/Perticon_8_8_new_serial_2/Icons/icon.png
+Exec=/home/perticon/projects/Perticon_8_8_new_serial_2/compile.sh

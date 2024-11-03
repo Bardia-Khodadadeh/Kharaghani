@@ -1,0 +1,43 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>Home.qml</file>
+        <file>Icons/Logo.png</file>
+        <file>MyButton.qml</file>
+        <file>Icons/Logo1.png</file>
+        <file>Icons/login.png</file>
+        <file>MyMessageBox.qml</file>
+        <file>colors/blue_color.jpg</file>
+        <file>colors/green_color.jpg</file>
+        <file>colors/orange_color.jpg</file>
+        <file>colors/red_color.jpg</file>
+        <file>colors/yellow_color.jpg</file>
+        <file>Icons/Camera.png</file>
+        <file>Icons/Camera_dis.png</file>
+        <file>Icons/eth.png</file>
+        <file>Icons/eth_dis.png</file>
+        <file>Icons/saqqa.png</file>
+        <file>Icons/add.png</file>
+        <file>Icons/apply.png</file>
+        <file>Icons/calendar.png</file>
+        <file>Icons/cancel.png</file>
+        <file>Icons/delete.png</file>
+        <file>Icons/delete2.png</file>
+        <file>Icons/draw.png</file>
+        <file>Icons/edit.png</file>
+        <file>Icons/icon.png</file>
+        <file>Icons/icons8-edit-24.png</file>
+        <file>Icons/logo.jpg</file>
+        <file>Icons/report.png</file>
+        <file>Icons/setting.png</file>
+        <file>Icons/start.png</file>
+        <file>Icons/stop.png</file>
+        <file>Icons/undo.png</file>
+        <file>CustomCalendar.qml</file>
+        <file>Icons/garder_1.png</file>
+        <file>Icons/grader_2.png</file>
+        <file>Icons/grader_3.png</file>
+        <file>Icons/excel.png</file>
+        <file>Icons/grader_4.png</file>
+    </qresource>
+</RCC>

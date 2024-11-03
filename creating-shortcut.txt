@@ -1,0 +1,19 @@
+1.In the project folder terminal:
+> ./compile.sh
+_______________________________________
+2. Run linux.run file in the output folder and install it.
+_______________________________________
+3. create *.desktop file and paste below:
+[Desktop Entry]
+Type=Application
+Terminal=true
+Name=application-name-shown-in-dash
+Icon=/path/to/icon/icon.png
+Exec=/path/to/file/fileName.sh 
+_______________________________________	
+4. copy .desktop file to /usr/share/applications/ using terminal:
+> sudo cp /path/to/file/*.desktop /usr/share/applications/  	
+_______________________________________
+5. open /usr/share/applications/ , Find *.desktop file you copied, right click and copy to desktop. right click on *.desktop file and click "Allow Launching"
+_______________________________________
+6. To run the application on boot *.sh file can be added to start up applications
