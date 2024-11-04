@@ -49,7 +49,6 @@ void Tcp_Server::findClients()
         QTcpSocket* clientSocket = _server->nextPendingConnection();
         qDebug() << clientSocket->peerAddress().toString();
 
-
         if(clientSocket->peerAddress().toString() == "::ffff:192.168.0.201")
         {
             _ejectorBoards[0]->_clientSocket = clientSocket;
