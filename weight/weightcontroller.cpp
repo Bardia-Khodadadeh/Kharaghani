@@ -140,8 +140,6 @@ void WeightController::mainLoop(int _en, int &_cup) {
                         }
                     });
 
-
-
                     // if(_lines[1]->getFinalWeight() > 30)
                     //     qDebug() << "_________" << _cup % 283 <<  _lines[1]->getFinalWeight();
                 }
@@ -227,14 +225,6 @@ void WeightController::updateChartA() {
                 max = a;
         }
     }
-
-    QSet<int> seen;
-    QVector<double> result;
-    QVector<int> duplicateIndexes;
-
-    QVector<int> _posLeft;
-
-    QVector<double> _weightLeft;
 
     m_posLui = m_posLeft;
     m_weightLui = m_weightLeft;

@@ -201,8 +201,8 @@ void CameraController::startAnalise(int &_cup)
     _processor.setClassesList(m_classNamesList);
     _processor.setOutputSize(cv::Size(384, 384));
 
-    // _camPackList.clear();
-    // preparingTheCameras();
+    _camPackList.clear();
+    preparingTheCameras();
     modelWarmUp();
 
     setBatchID(0);
@@ -478,6 +478,8 @@ void CameraController::stopAnalise()
     _processor._labeledFrame.clear();
 
     disconnect(_showFrameTimer, &QTimer::timeout, this, &CameraController::process);
+    disconnect(this,&CameraController::goToProcess, this, &CameraController::processInputs);
+
     _showFrameTimer->stop();
 
     m_cameraIsStarted.fill(false);

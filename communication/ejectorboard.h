@@ -28,13 +28,16 @@ public:
     int _cup = 0;
     int _connectionCounter = 0;
     int _shift = 0;
-    int _res[283][8] = {{0}};
+
+
     bool flagEject = false;
     QString _ip{""};
     QVector<int> _outputs;
 
 
     int _cupEjectorNum[283] = {-1};
+
+    std::vector<int> _boardOutputs[283];
 
     QVector<int> _lnCup;
     QVector<bool> _test;
@@ -48,6 +51,7 @@ public:
 
     void setBytesToSend();
 
+    void sendEjectCommand(QString cmnd);
 public Q_SLOTS:
     void readDataEthernet();
     void testEachEjector(int ejectorID);

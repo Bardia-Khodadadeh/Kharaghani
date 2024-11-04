@@ -83,6 +83,14 @@ void EjectorBoard::setBytesToSend()
         flg_eng= true;
 }
 
+void EjectorBoard::sendEjectCommand(QString cmnd)
+{
+    if(_posFinal > _energize)
+    {
+        writeDataEthernet(cmnd.toUtf8(), TCP);
+    }
+}
+
 void EjectorBoard::testEachEjector(int ejectorID)
 {
     sendString = "Zabcdefghijkl";

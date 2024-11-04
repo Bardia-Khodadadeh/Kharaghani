@@ -69,6 +69,8 @@ private:
     QVector<QString> _ejectorB_Ips;
     QVector<int> _ejectorB_Outputs;
 
+    QVector<int> _boardOutputs[2][283];
+
     QVector<QString> engineStatus;
 
     int _currentCup = 0;
@@ -139,6 +141,17 @@ private:
     bool _sizeConditions[2][8] = {{false}};
     bool _colorConditions[2][8] = {{false}};
     bool _defectConditions[2][8] = {{false}};
+    ////////////////////////////////////////////////////////////////////
+    int _res_L[283][8] = {{0}};
+    int _res_R[283][8] = {{0}};
+
+    QString _ejectCommand_L = "z:000000000000";
+    QString _ejectCommand_R = "z:000000000000";
+
+    int _maxStringLength = 12;
+
+
+    /////////////////////////////////////////////////////////////////////
 
     int _cupID;
     int _ejectCup = 0;
@@ -329,6 +342,7 @@ public:
     void setErrorCupB(bool newErrorCupB);
 
     void filligArraysAndVars();
+    void makeEjectCommand();
 public Q_SLOTS:
     void startGrader(QString speed);
     void startManual(int boadrID, int motorID, bool checked);
@@ -360,6 +374,8 @@ public Q_SLOTS:
     void setTikaSpeed(QString speed);
     void startFeeding();
     void updateUI();
+    void sendEject();
+    void encoderPulseChanged();
 Q_SIGNALS:
     void wLowChanged();
     void wHighChanged();

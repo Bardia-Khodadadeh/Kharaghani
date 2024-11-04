@@ -11,6 +11,8 @@ Tcp_Server::Tcp_Server() {
         _testLeft.push_back(false);
         _testRight.push_back(false);
     }
+
+    _ipList.clear();
 }
 
 void Tcp_Server::run()

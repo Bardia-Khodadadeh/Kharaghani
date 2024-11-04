@@ -133,15 +133,21 @@ void EthernetController::clearArrays()
     _ejectorB_Outputs.clear();
 }
 
+void EthernetController::sendEject()
+{
+    tcpServer->_ejectorBoards[0]->_posFinal = _pulseReader->_posFinal;
+    tcpServer->_ejectorBoards[1]->_posFinal = _pulseReader->_posFinal;
+
+    tcpServer->_ejectorBoards[0]->_cup = _pulseReader->_cup;
+    tcpServer->_ejectorBoards[1]->_cup = _pulseReader->_cup;
+
+    tcpServer->_ejectorBoards[0]->sendEjectCommand(_ejectCommand_L);
+    tcpServer->_ejectorBoards[1]->sendEjectCommand(_ejectCommand_R);
+}
+
 void EthernetController::readDb(QString exf)
 {
-    connect(_pulseReader, &PulseReader::encoderChanged, [=](){
-        tcpServer->_ejectorBoards[0]->_posFinal = _pulseReader->_posFinal;
-        tcpServer->_ejectorBoards[1]->_posFinal = _pulseReader->_posFinal;
-
-        tcpServer->_ejectorBoards[0]->_cup = _pulseReader->_cup;
-        tcpServer->_ejectorBoards[1]->_cup = _pulseReader->_cup;
-    });
+    connect(_pulseReader, &PulseReader::encoderChanged, this, &EthernetController::sendEject);
 
     QVector<QVector<QString>> res = _db->readOutputs(exf);
 
@@ -261,6 +267,23 @@ bool EthernetController::evaluateColorCondition(const QString &condition, std::v
     return false;
 }
 
+void EthernetController::encoderPulseChanged()
+{
+    if(programStarted)
+    {
+        qDebug() << "___________________________" << _pulseReader->_posFinal;
+
+        readDataEthernet(_pulseReader->_posFinal, _pulseReader->_prevPosFinal);
+
+        if(_cameraController->m_cameraIsStarted[0] && _cameraController->m_cameraIsStarted[1])
+        {
+            _cameraController->mainLoop(_pulseReader->_posFinal, _pulseReader->_cup);
+        }
+
+        _weightController->mainLoop(_pulseReader->_posFinal, _pulseReader->_cup);
+    }
+}
+
 void EthernetController::setupEthernetConnection()
 {
     qDebug() << "---" << Q_FUNC_INFO;
@@ -268,35 +291,11 @@ void EthernetController::setupEthernetConnection()
     _pulseReader->_cup = 0;
     setGraderStatus(Calibrating);
 
-    connect(_pulseReader, &PulseReader::encoderChanged, [=](){
-        if(programStarted)
-            readDataEthernet(_pulseReader->_posFinal, _pulseReader->_prevPosFinal);
-    });
-    connect(_pulseReader, &PulseReader::encoderChanged, [=](){
-        if(programStarted)
-            _weightController->mainLoop(_pulseReader->_posFinal, _pulseReader->_cup);
-    });
-
-    if(_cameraController->m_serials.size() == 2)
-        if(_cameraController->m_startCameras)
-        {
-            if(!_cameraController->m_cameraIsStarted[0] && !_cameraController->m_cameraIsStarted[1])
-            {
-                _cameraController->startAnalise(_pulseReader->_cup);
-            }
-            connect(_pulseReader, &PulseReader::encoderChanged, [=](){
-                //qDebug() << "________" << _en;
-                if(programStarted)
-                    _cameraController->mainLoop(_pulseReader->_posFinal, _pulseReader->_cup);
-            });
-
-        }
+    connect(_pulseReader, &PulseReader::encoderChanged, this, &EthernetController::encoderPulseChanged);
 
     QObject::connect(_weightController, &WeightController::weightingFinished, this, &EthernetController::eject);
 
-
     programStarted = true;
-
 }
 
 void EthernetController::readDataEthernet(int pos, int prevPos)
@@ -307,15 +306,14 @@ void EthernetController::readDataEthernet(int pos, int prevPos)
 
         _connectionTryCounter = 0;
 
-
-        if(0 <= tcpServer->_ejectorBoards[0]->_cup && tcpServer->_ejectorBoards[0]->_cup < SharedData::_totalCupNumber)
+        if(0 <= _pulseReader->_cup && _pulseReader->_cup < SharedData::_totalCupNumber)
         {
             setGraderStatus(GraderStatus::Calibrating);
         }
 
-        _cupID = tcpServer->_ejectorBoards[0]->_cup % SharedData::_totalCupNumber;
+        _cupID = _pulseReader->_cup % SharedData::_totalCupNumber;
 
-        if(tcpServer->_ejectorBoards[0]->_cup >= _calRounds * SharedData::_totalCupNumber) setGraderStatus(GraderStatus::Grading);
+        if(_pulseReader->_cup >= _calRounds * SharedData::_totalCupNumber) setGraderStatus(GraderStatus::Grading);
         //qDebug() << _finalLeft << _finalRight;
 
         _weightController->pushToWeights(0, _pulseReader->_finalLeft);
@@ -408,6 +406,15 @@ void EthernetController::start(QString speed)
 
     tcpServer->setVars();
 
+    if(_cameraController->m_serials.size() == 2)
+        if(_cameraController->m_startCameras)
+        {
+            if(!_cameraController->m_cameraIsStarted[0] && !_cameraController->m_cameraIsStarted[1])
+            {
+                _cameraController->startAnalise(_pulseReader->_cup);
+            }
+        }
+
     setupEthernetConnection();
 
     connect(_reportTimer, &QTimer::timeout, this, &EthernetController::updateReport);
@@ -417,12 +424,41 @@ void EthernetController::start(QString speed)
     Start_time = QTime::currentTime();
 }
 
+void EthernetController::makeEjectCommand()
+{
+    for(int i=0;i<_maxStringLength;i++)
+    {
+        _ejectCommand_L[i + 2] = '0';
+        _ejectCommand_R[i + 2] = '0';
+    }
+
+    for(int i=0;i<8;i++)
+    {
+        int index_L = (_cupID % SharedData::_totalCupNumber + 283 - _distanceFromLC - _lnaCup[i]) % 283;
+
+        for(auto o:_boardOutputs[0][index_L])
+            _ejectCommand_L[o + 2] = '1';
+
+        int index_R = (_cupID % SharedData::_totalCupNumber + 283 - _distanceFromLC - _lnbCup[i]) % 283;
+
+        for(auto o:_boardOutputs[1][index_R])
+            _ejectCommand_R[o + 2] = '1';
+    }
+}
+
 void EthernetController::updateUI()
 {
+    makeEjectCommand();
+
+
     if(m_errorCupA)
     {
         if(abs(_wLeft) >= m_errorCupValueA)
         {
+            int index = _ejectorA_Ips[0] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+            _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[0]);
+
             tcpServer->_ejectorBoards[0]->_cupEjectorNum[_ejectCup] = 0;
             _weightController->m_flagTableA = false;
 
@@ -434,6 +470,10 @@ void EthernetController::updateUI()
     if(m_errorCupB)
         if(abs(_wRight) >= m_errorCupValueB)
         {
+            int index = _ejectorB_Ips[0] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+            _boardOutputs[index][_ejectCup].push_back(_ejectorB_Outputs[0]);
+
             tcpServer->_ejectorBoards[1]->_cupEjectorNum[_ejectCup] = 0;
             _weightController->m_flagTableB = false;
 
@@ -445,7 +485,7 @@ void EthernetController::updateUI()
     {
         if(ind_res != -1)
         {
-            if(tcpServer->_ejectorBoards[0]->_res[_ejectCup][ind_res] != 0)
+            if(_res_L[_ejectCup][ind_res] != 0)
             {
                 m_totalCountLeft[ind_res]++;
                 _totalWeightLeft[ind_res] += _wLeft;
@@ -459,7 +499,7 @@ void EthernetController::updateUI()
     {
         if(ind_res2 != -1)
         {
-            if(tcpServer->_ejectorBoards[1]->_res[_ejectCup][ind_res2] != 0)
+            if(_res_R[_ejectCup][ind_res2] != 0)
             {
                 m_totalCountRight[ind_res2]++;
                 _totalWeightRight[ind_res2] += _wRight;
@@ -909,17 +949,18 @@ void EthernetController::eject()
                 _outpuRules.push_back(indexes);
             }
 
-            //qDebug() << m_outputsUsed;
-            // qDebug() << _outpuRules;
+
 
             tcpServer->_ejectorBoards[0]->_cupEjectorNum[_ejectCup] = -1;
             tcpServer->_ejectorBoards[1]->_cupEjectorNum[_ejectCup] = -1;
 
+            _boardOutputs[0][_ejectCup].clear();
+            _boardOutputs[1][_ejectCup].clear();
 
             for(int i=0;i<8;i++)
             {
-                tcpServer->_ejectorBoards[0]->_res[_ejectCup][i] = 0;
-                tcpServer->_ejectorBoards[1]->_res[_ejectCup][i] = 0;
+                _res_L[_ejectCup][i] = 0;
+                _res_R[_ejectCup][i] = 0;
             }
 
 
@@ -963,31 +1004,31 @@ void EthernetController::eject()
                                 }
 
                             if(_weightConditions[0][i])
-                                tcpServer->_ejectorBoards[0]->_res[_ejectCup][i] += 2;
+                                _res_L[_ejectCup][i] += 2;
 
                             if(_weightConditions[1][i])
-                                tcpServer->_ejectorBoards[1]->_res[_ejectCup][i] += 2;
+                                _res_R[_ejectCup][i] += 2;
 
                         }
                         else
                         {
                             if(_defectConditions[0][i])
                                 if(_defectIsEnabled[i])
-                                    tcpServer->_ejectorBoards[0]->_res[_ejectCup][i] += 4;
+                                    _res_L[_ejectCup][i] += 4;
                             if(_weightConditions[0][i])
-                                tcpServer->_ejectorBoards[0]->_res[_ejectCup][i] += 2;
+                                _res_L[_ejectCup][i] += 2;
                             if(_colorConditions[0][i])
                                 if(_colorIsEnabled[i])
-                                    tcpServer->_ejectorBoards[0]->_res[_ejectCup][i] += 1;
+                                    _res_L[_ejectCup][i] += 1;
 
                             if(_defectConditions[1][i])
                                 if(_defectIsEnabled[i])
-                                    tcpServer->_ejectorBoards[1]->_res[_ejectCup][i] += 4;
+                                    _res_R[_ejectCup][i] += 4;
                             if(_weightConditions[1][i])
-                                tcpServer->_ejectorBoards[1]->_res[_ejectCup][i] += 2;
+                                _res_R[_ejectCup][i] += 2;
                             if(_colorConditions[1][i])
                                 if(_colorIsEnabled[i])
-                                    tcpServer->_ejectorBoards[1]->_res[_ejectCup][i] += 1;
+                                    _res_R[_ejectCup][i] += 1;
 
                             //if(_weightConditions[1][i]) qDebug() << _ejectCup << "mmmmmmmmmmmmmmmmmmmmmm";
                         }
@@ -1011,7 +1052,7 @@ void EthernetController::eject()
 
                 for(int i=0;i<8;i++)
                 {
-                    int val = tcpServer->_ejectorBoards[0]->_res[_ejectCup][i];
+                    int val = _res_L[_ejectCup][i];
                     int cnt = m_totalCountLeft[i];
 
                     if((val % 4) / 2 > 1)
@@ -1033,7 +1074,7 @@ void EthernetController::eject()
 
                 for(int i=0;i<8;i++)
                 {
-                    int val = tcpServer->_ejectorBoards[1]->_res[_ejectCup][i];
+                    int val = _res_R[_ejectCup][i];
                     int cnt = m_totalCountRight[i];
 
                     if((val % 4) / 2 > 1)
@@ -1052,17 +1093,31 @@ void EthernetController::eject()
                         }
                     }
                 }
-                tcpServer->_ejectorBoards[0]->_cupEjectorNum[_ejectCup] = ind_res;
 
-                tcpServer->_ejectorBoards[1]->_cupEjectorNum[_ejectCup] = ind_res2;
+
+                if(ind_res != -1)
+                {
+                    QString ip = _ejectorA_Ips[ind_res];
+
+                    int index = _ejectorA_Ips[ind_res] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+                    _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[ind_res]);
+                }
+
+                if(ind_res2 != -1)
+                {
+                    int index = _ejectorB_Ips[ind_res2] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+                    _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[ind_res]);
+                }
             }
 
             if(ind_res2 != -1)
             {
-                qDebug() << "T" << _ejectCup << tcpServer->_ejectorBoards[1]->_res[_ejectCup][0] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][1] <<
-                    tcpServer->_ejectorBoards[1]->_res[_ejectCup][2] <<  tcpServer->_ejectorBoards[1]->_res[_ejectCup][3] <<
-                    tcpServer->_ejectorBoards[1]->_res[_ejectCup][4] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][5] <<
-                    tcpServer->_ejectorBoards[1]->_res[_ejectCup][6] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][7];
+                // qDebug() << "T" << _ejectCup << tcpServer->_ejectorBoards[1]->_res[_ejectCup][0] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][1] <<
+                //     tcpServer->_ejectorBoards[1]->_res[_ejectCup][2] <<  tcpServer->_ejectorBoards[1]->_res[_ejectCup][3] <<
+                //     tcpServer->_ejectorBoards[1]->_res[_ejectCup][4] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][5] <<
+                //     tcpServer->_ejectorBoards[1]->_res[_ejectCup][6] << tcpServer->_ejectorBoards[1]->_res[_ejectCup][7];
                 qDebug() << "Index" << _ejectCup << ind_res2;
             }
 
@@ -1083,7 +1138,6 @@ void EthernetController::eject()
             _totalWeights.resize(8);
             _totalWeights.fill(0);
 
-
             Q_EMIT ejectDecisionFinished();
         });
 
@@ -1094,12 +1148,6 @@ void EthernetController::eject()
 
         // if(tcpServer->_ejectorBoards[1]->_res[0][_ejectCup][0])
         //     qDebug() << "Ejc___________" << _ejectCup;
-
-
-
-
-
-
 
 
 
@@ -1347,11 +1395,15 @@ void EthernetController::stop()
     setGraderStatus(Stopped);
     programStarted = false;
     tcpServer->_ejectorBoards[0]->_cup = 0;
-    QObject::disconnect(_weightController, &WeightController::weightingFinished, this, &EthernetController::eject);
 
     tcpServer->_motorBoard->_calibratingFinished = false;
 
+    disconnect(_weightController, &WeightController::weightingFinished, this, &EthernetController::eject);
+    disconnect(_motorTimer, &QTimer::timeout, this, &EthernetController::checkMotorsStatus);
+    disconnect(_pulseReader, &PulseReader::encoderChanged, this, &EthernetController::sendEject);
     disconnect(this, &EthernetController::ejectDecisionFinished, this, &EthernetController::updateUI);
+    disconnect(_reportTimer, &QTimer::timeout, this, &EthernetController::updateReport);
+    disconnect(_pulseReader, &PulseReader::encoderChanged, this, &EthernetController::encoderPulseChanged);
 
 
     // disconnect(_pulseReader, &PulseReader::encoderChanged, this, &EthernetController::readDataEthernet);
@@ -1369,6 +1421,9 @@ void EthernetController::stop()
 
     for(int i=0;i<283;i++)
     {
+        _boardOutputs[0][i].clear();
+        _boardOutputs[1][i].clear();
+
         tcpServer->_ejectorBoards[0]->_cupEjectorNum[i] = -1;
         tcpServer->_ejectorBoards[1]->_cupEjectorNum[i] = -1;
     }
@@ -1379,8 +1434,8 @@ void EthernetController::stop()
     for(int j=0;j<283;j++)
         for(int k=0;k<8;k++)
         {
-            tcpServer->_ejectorBoards[0]->_res[j][k] = 0;
-            tcpServer->_ejectorBoards[1]->_res[j][k] = 0;
+            _res_L[j][k] = 0;
+            _res_R[j][k] = 0;
         }
 
     for(int i=0;i<SharedData::_numberOfLines;i++)

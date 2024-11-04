@@ -41,6 +41,8 @@ public:
     QVector<bool> _testLeft;
     QVector<bool> _testRight;
 
+    QVector<QString> _ipList;
+
     bool flg_ejc = true;
 
     void setVars();
