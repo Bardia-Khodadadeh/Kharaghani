@@ -57,6 +57,7 @@ public Q_SLOTS:
     void testEachEjector(int ejectorID);
 
 Q_SIGNALS:
+    void sendEjectCommmand(QString cmnd);
 };
 
 

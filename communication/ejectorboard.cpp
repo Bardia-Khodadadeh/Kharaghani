@@ -10,7 +10,6 @@ EjectorBoard::~EjectorBoard()
     sendString = "Z:000000000000";
 }
 
-
 void EjectorBoard::setupConnections()
 {
     _lnCup.resize(8);
@@ -44,7 +43,7 @@ void EjectorBoard::setupConnections()
     });
     _testConnectionTimer->start(1);
 
-
+    QObject::connect(this, &EjectorBoard::sendEjectCommand, this, &EjectorBoard::sendEjectCommand);
     QObject::connect(_clientSocket, &QTcpSocket::readyRead, this, &EjectorBoard::readDataEthernet);
 }
 

@@ -2769,18 +2769,13 @@ Pane {
                                     dbController.setIdx("Ejector_B", bfIp.text + "," + bfOutput.text, 5)
                                     dbController.setIdx("Ejector_B", bgIp.text + "," + bgOutput.text, 6)
                                     dbController.setIdx("Ejector_B", bhIp.text + "," + bhOutput.text, 7)
-                                    dbController.updateEjectorA()
+                                    dbController.updateEjectorB()
 
                                     showMessageBox("Ejectors Setting Updated")
                                 }
                             }
-
                         }
-
-
                     }
-
-
                 }
 
 

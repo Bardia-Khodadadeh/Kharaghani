@@ -63,11 +63,9 @@ private:
     QVector<QString> t1Status;
     QVector<QString> t2Status;
 
-    QVector<QString> _ejectorA_Ips;
-    QVector<int> _ejectorA_Outputs;
 
-    QVector<QString> _ejectorB_Ips;
-    QVector<int> _ejectorB_Outputs;
+    QMap<int, QMap<QString, int>> _ejectors_L;
+    QMap<int, QMap<QString, int>> _ejectors_R;
 
     QVector<int> _boardOutputs[2][283];
 

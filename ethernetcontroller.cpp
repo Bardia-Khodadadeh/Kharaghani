@@ -126,11 +126,9 @@ void EthernetController::clearArrays()
     _colorCondition.clear();
     _defectEnables.clear();
 
-    _ejectorA_Ips.clear();
-    _ejectorA_Outputs.clear();
+    _ejectors_L.clear();
+    _ejectors_R.clear();
 
-    _ejectorB_Ips.clear();
-    _ejectorB_Outputs.clear();
 }
 
 void EthernetController::sendEject()
@@ -141,8 +139,8 @@ void EthernetController::sendEject()
     tcpServer->_ejectorBoards[0]->_cup = _pulseReader->_cup;
     tcpServer->_ejectorBoards[1]->_cup = _pulseReader->_cup;
 
-    tcpServer->_ejectorBoards[0]->sendEjectCommand(_ejectCommand_L);
-    tcpServer->_ejectorBoards[1]->sendEjectCommand(_ejectCommand_R);
+    Q_EMIT tcpServer->_ejectorBoards[0]->sendEjectCommand(_ejectCommand_L);
+    Q_EMIT tcpServer->_ejectorBoards[1]->sendEjectCommand(_ejectCommand_R);
 }
 
 void EthernetController::readDb(QString exf)
@@ -369,21 +367,24 @@ void EthernetController::start(QString speed)
     _db->readEjectorA();
     _db->readEjectorB();
 
-    for(auto &str:_db->ejectorA())
-    {
-        _ejectorA_Ips.push_back(str.split(',')[0]);
-        _ejectorA_Outputs.push_back((str.split(',')[1]).toInt());
+    for (int i = 0; i < _db->ejectorA().length(); ++i) {
+        QMap<QString, int> temp;
+        QString str =  _db->ejectorA()[i];
+
+        temp[str.split(',')[0]] = (str.split(',')[1]).toInt();
+
+        _ejectors_L[i] = temp;
     }
 
-    tcpServer->_ejectorBoards[0]->_outputs =  _ejectorA_Outputs;
 
-    for(auto &str:_db->ejectorB())
-    {
-        _ejectorB_Ips.push_back(str.split(',')[0]);
-        _ejectorB_Outputs.push_back((str.split(',')[1]).toInt());
+    for (int i = 0; i < _db->ejectorB().length(); ++i) {
+        QMap<QString, int> temp;
+        QString str =  _db->ejectorB()[i];
+
+        temp[str.split(',')[0]] = (str.split(',')[1]).toInt();
+
+        _ejectors_R[i] = temp;
     }
-
-    tcpServer->_ejectorBoards[1]->_outputs =  _ejectorB_Outputs;
 
     for(int i=7;i<=14;i++) {
         _lnaCup[i - 7] = _db->lnaSetting()[i].toInt();
@@ -436,10 +437,28 @@ void EthernetController::makeEjectCommand()
     {
         int index_L = (_cupID % SharedData::_totalCupNumber + 283 - _distanceFromLC - _lnaCup[i]) % 283;
 
+        QString ip_L = _ejectors_L[i].firstKey();
+        int output_L = _ejectors_L[i].first();
+
+        int index = ip_L == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+        if(m_testLeft[i])
+            if(_pulseReader->_cup % 2  == 0)
+                index == 0 ? _ejectCommand_L[output_L + 2] = '1' : _ejectCommand_R[output_L + 2] = '1';
+
         for(auto o:_boardOutputs[0][index_L])
             _ejectCommand_L[o + 2] = '1';
 
         int index_R = (_cupID % SharedData::_totalCupNumber + 283 - _distanceFromLC - _lnbCup[i]) % 283;
+
+        QString ip_R = _ejectors_R[i].firstKey();
+        int output_R = _ejectors_R[i].first();
+
+        index = ip_R == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+        if(m_testRight[i])
+            if(_pulseReader->_cup % 2  == 0)
+                index == 0 ? _ejectCommand_L[output_R + 2] = '1' : _ejectCommand_R[output_R + 2] = '1';
 
         for(auto o:_boardOutputs[1][index_R])
             _ejectCommand_R[o + 2] = '1';
@@ -450,14 +469,16 @@ void EthernetController::updateUI()
 {
     makeEjectCommand();
 
-
     if(m_errorCupA)
     {
         if(abs(_wLeft) >= m_errorCupValueA)
         {
-            int index = _ejectorA_Ips[0] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+            QString ip = _ejectors_L[0].firstKey();
+            int output = _ejectors_L[0].first();
 
-            _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[0]);
+            int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+            _boardOutputs[index][_ejectCup].push_back(output);
 
             tcpServer->_ejectorBoards[0]->_cupEjectorNum[_ejectCup] = 0;
             _weightController->m_flagTableA = false;
@@ -470,9 +491,12 @@ void EthernetController::updateUI()
     if(m_errorCupB)
         if(abs(_wRight) >= m_errorCupValueB)
         {
-            int index = _ejectorB_Ips[0] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+            QString ip = _ejectors_R[0].firstKey();
+            int output = _ejectors_R[0].first();
 
-            _boardOutputs[index][_ejectCup].push_back(_ejectorB_Outputs[0]);
+            int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+            _boardOutputs[index][_ejectCup].push_back(output);
 
             tcpServer->_ejectorBoards[1]->_cupEjectorNum[_ejectCup] = 0;
             _weightController->m_flagTableB = false;
@@ -814,7 +838,6 @@ void EthernetController::setDefect(int idx, int outputID, QVector<bool> _defectI
         j++;
     }
 
-
     if(_defectIsEnabled[idx])
     {
         if(_imageHasDefects[0][0] >= 1) // Check if there is an apple in the image
@@ -949,8 +972,6 @@ void EthernetController::eject()
                 _outpuRules.push_back(indexes);
             }
 
-
-
             tcpServer->_ejectorBoards[0]->_cupEjectorNum[_ejectCup] = -1;
             tcpServer->_ejectorBoards[1]->_cupEjectorNum[_ejectCup] = -1;
 
@@ -966,7 +987,6 @@ void EthernetController::eject()
 
             if(m_graderStatus == Grading)
             {
-
                 val_res=-1  ;cnt_res=-1 , ind_res=-1;
                 val_res2=-1  ;cnt_res2=-1 , ind_res2=-1;
                 QVector<bool> _colorIsEnabled;
@@ -993,7 +1013,6 @@ void EthernetController::eject()
 
                         if(_cameraController->m_serials.empty() || !_cameraController->m_startCameras)
                         {
-
                             for(int x=0;x<2;x++)
                                 for(int y=0;y<8;y++)
                                 {
@@ -1052,6 +1071,8 @@ void EthernetController::eject()
 
                 for(int i=0;i<8;i++)
                 {
+
+
                     int val = _res_L[_ejectCup][i];
                     int cnt = m_totalCountLeft[i];
 
@@ -1097,18 +1118,22 @@ void EthernetController::eject()
 
                 if(ind_res != -1)
                 {
-                    QString ip = _ejectorA_Ips[ind_res];
+                    QString ip = _ejectors_L[ind_res].firstKey();
+                    int output = _ejectors_L[ind_res].first();
 
-                    int index = _ejectorA_Ips[ind_res] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+                    int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
 
-                    _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[ind_res]);
+                    _boardOutputs[index][_ejectCup].push_back(output);
                 }
 
                 if(ind_res2 != -1)
                 {
-                    int index = _ejectorB_Ips[ind_res2] == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+                    QString ip = _ejectors_R[ind_res].firstKey();
+                    int output = _ejectors_R[ind_res].first();
 
-                    _boardOutputs[index][_ejectCup].push_back(_ejectorA_Outputs[ind_res]);
+                    int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+                    _boardOutputs[index][_ejectCup].push_back(output);
                 }
             }
 
@@ -1601,37 +1626,53 @@ void EthernetController::setTestRight(const QVector<bool> &newTestRight)
 void EthernetController::setIdxTestLeft(int idx, bool checked)
 {
     m_testLeft[idx] = checked;
-    tcpServer->_ejectorBoards[0]->_test[idx] = checked;
 }
 
 void EthernetController::setIdxTestRight(int idx, bool checked)
 {
     m_testRight[idx] = checked;
-    tcpServer->_ejectorBoards[1]->_test[idx] = checked;
 }
 
 void EthernetController::testEachEjector(int lineID, int ejectorID)
 {
-    tcpServer->_ejectorBoards[0]->sendStr = "Z:000000000000";
-    tcpServer->_ejectorBoards[1]->sendStr = "Z:000000000000";
+    QString sendStr = "Z:";
+
+    for(int i=0;i<_maxStringLength;i++)
+    {
+        sendStr.append('0');
+    }
 
     if(lineID == 0)
     {
-        tcpServer->_ejectorBoards[0]->sendStr[ejectorID + 2] = '1';
-        tcpServer->_ejectorBoards[0]->flagEject = true;
+        QString ip = _ejectors_L[ejectorID].firstKey();
+        int output = _ejectors_L[ejectorID].first();
+
+        int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+        sendStr[output + 2] = '1';
+
+        Q_EMIT tcpServer->_ejectorBoards[index]->sendEjectCommand(sendStr);
     }
     else
     {
-        tcpServer->_ejectorBoards[1]->sendStr[ejectorID + 2] = '1';
-        tcpServer->_ejectorBoards[1]->flagEject = true;
+        QString ip = _ejectors_R[ejectorID].firstKey();
+        int output = _ejectors_R[ejectorID].first();
+
+        int index = ip == tcpServer->_ejectorBoards[0]->_ip ? 0 : 1;
+
+        sendStr[output + 2] = '1';
+
+        Q_EMIT tcpServer->_ejectorBoards[index]->sendEjectCommand(sendStr);
     }
 
-    QTimer::singleShot(50, [=](){
-        tcpServer->_ejectorBoards[0]->sendStr = "Z:000000000000";
-        tcpServer->_ejectorBoards[1]->sendStr = "Z:000000000000";
+    QTimer::singleShot(50, [this, &sendStr](){
+        for(int i=0;i<_maxStringLength;i++)
+        {
+            sendStr[i + 2] = '1';
+        }
 
-        tcpServer->_ejectorBoards[0]->flagEject = true;
-        tcpServer->_ejectorBoards[1]->flagEject = true;
+        Q_EMIT tcpServer->_ejectorBoards[0]->sendEjectCommand(sendStr);
+        Q_EMIT tcpServer->_ejectorBoards[1]->sendEjectCommand(sendStr);
     });
 }
 
